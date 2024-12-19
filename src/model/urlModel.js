@@ -20,6 +20,10 @@ const urlSchema = new mongoose.Schema(
       unique: true,
       trim: true,
     },
+    userMetadata: {
+      type: Object,
+      trim: true,
+    },
   },
   { timestamps: true }
 );
