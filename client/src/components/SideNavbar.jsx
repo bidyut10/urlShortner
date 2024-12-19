@@ -39,7 +39,7 @@ const SideNavbar = ({ onSelectTool }) => {
       >
         <div className="p-6 flex items-center justify-start mt-16">
           <img src={icon} alt="Logo" className="w-5 cursor-pointer" />
-          <h1 className="ml-4 text-2xl font-normal">Cuturl</h1>
+          <h1 className="ml-4 text-3xl font-normal">Cuturl</h1>
         </div>
 
         <nav className="p-4">

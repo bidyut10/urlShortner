@@ -19,7 +19,7 @@ const ApiDocumentation = () => {
         <h2 className="text-2xl font-normal ">Documentation</h2>
         <p className="text-gray-600 text-lg">
           Welcome to the{" "}
-          <strong className="text-blue-500">URL Shortener API</strong>{" "}
+          <strong className="text-blue-500">Cuturl Shortener API</strong>{" "}
           documentation. This API allows you to shorten long URLs easily. Simply
           send a <span className="text-green-600">POST</span> request with the{" "}
           <strong>URL</strong> you want to shorten, and the API will return a
@@ -36,7 +36,7 @@ const ApiDocumentation = () => {
           <li>
             Base URL: The API is hosted at{" "}
             <span className="text-blue-500">
-              `http://cuturl.com/api/v1/url`
+              `https://cuturl-oi0x.onrender.com/api/shorten`
             </span>
             . All POST requests should be sent to this endpoint.
           </li>
@@ -46,13 +46,17 @@ const ApiDocumentation = () => {
             and returns a shortened URL.
           </li>
         </ul>
-        <div className="bg-gray-100 p-4 rounded-lg relative mt-4">
+        <div className="bg-gray-100 p-4 rounded-lg relative mt-4 overflow-x-auto">
           <code className="text-xl">
             <span className="text-blue-500">POST</span>{" "}
-            http://cuturl.com/api/v1/url
+            https://cuturl-oi0x.onrender.com/api/shorten
           </code>
           <button
-            onClick={() => copyToClipboard("POST http://cuturl.com/api/v1/url")}
+            onClick={() =>
+              copyToClipboard(
+                "POST https://cuturl-oi0x.onrender.com/api/shorten"
+              )
+            }
             className="absolute top-3 right-3 text-gray-800 hover:text-gray-950"
           >
             <IoCopyOutline />
@@ -130,7 +134,7 @@ const ApiDocumentation = () => {
 
 const shortenUrl = async (longUrl) => {
   try {
-    const response = await axios.post('http://cuturl.com/api/v1/url', { longUrl });
+    const response = await axios.post('https://cuturl-oi0x.onrender.com/api/shorten', { longUrl });
     console.log('Shortened URL:', response.data.data);
   } catch (error) {
     console.error('Error:', error.response ? error.response.data : error.message);
@@ -146,7 +150,7 @@ shortenUrl('http://example.com/long-url');`}
 
 const shortenUrl = async (longUrl) => {
   try {
-    const response = await axios.post('http://cuturl.com/api/v1/url', { longUrl });
+    const response = await axios.post('https://cuturl-oi0x.onrender.com/api/shorten', { longUrl });
     console.log('Shortened URL:', response.data.data);
   } catch (error) {
     console.error('Error:', error.response ? error.response.data : error.message);
@@ -194,8 +198,11 @@ shortenUrl('http://example.com/long-url');`)
           >
             {`{
   "status": true,
-  "data": "https://cuturl.com/dv345h",
-  "message": "successful"
+  "data":  {
+        "urlCode": "qz9edzale",
+        "longUrl": "https://react-icons.github.io/react-icons",
+        "shortUrl": "http://localhost:3000/Qz9EdZale"
+    }
 }`}
           </SyntaxHighlighter>
           <button
@@ -254,7 +261,7 @@ shortenUrl('http://example.com/long-url');`)
 
       {/* Custom alert */}
       {alertVisible && (
-        <div className="fixed bottom-4 right-4 bg-green-600 text-white px-4 py-2 rounded-md">
+        <div className="fixed top-0 right-4 bg-green-600 text-white px-4 py-2 rounded-md">
           <span>Copied successfully!</span>
         </div>
       )}

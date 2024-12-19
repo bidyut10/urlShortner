@@ -25,6 +25,9 @@ const Hero = () => {
 
   const handleGenerateShortUrl = async () => {
     try {
+      if (longUrl.length===0) {
+        showAlert("Fill the Url!", "error");
+      }
       const response = await axios.post(
         `${import.meta.env.VITE_BACKEND_URL}/api/shorten`,
         { longUrl }
@@ -56,7 +59,7 @@ const Hero = () => {
     <div className="max-w-3xl mx-auto space-y-10 my-[45px] px-5 md:px-0 pt-12 md:pt-0">
       {alertVisible.message && (
         <div
-          className={`fixed bottom-4 right-4 ${
+          className={`fixed top-4 right-4 ${
             alertVisible.type === "success" ? "bg-green-500" : "bg-red-500"
           } text-white px-4 py-2 rounded-md`}
         >
@@ -71,7 +74,7 @@ const Hero = () => {
         <p className="text-gray-600 text-lg">
           <strong className="text-purple-500">Cuturl</strong> transforms lengthy
           links from Instagram, Facebook, YouTube, Twitter, LinkedIn, WhatsApp,
-          TikTok, blogs, and websites into sleek, shareable URLs. Just paste
+           blogs, and websites into sleek, shareable URLs. Just paste
           your link, click {"'"}Generate Url{"'"}, and you’re good to go!
         </p>
       </header>
