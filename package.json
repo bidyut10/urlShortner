@@ -6,7 +6,7 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "node index.js",
-    "build": "npm install && npm install --prefix client && npm run build --prefix client"
+    "build": "npm install"
   },
   "repository": {
     "type": "git",
@@ -21,15 +21,20 @@
   "dependencies": {
     "compression": "^1.7.5",
     "cors": "^2.8.5",
+    "dns": "^0.2.2",
     "dotenv": "^16.4.7",
     "express": "^4.18.1",
+    "express-mongo-sanitize": "^2.2.0",
     "express-rate-limit": "^7.5.0",
-    "express-slow-down": "^2.0.3",
+    "express-slow-down": "^2.1.0",
     "helmet": "^8.0.0",
     "mongoose": "^6.4.4",
     "morgan": "^1.10.0",
     "node-cache": "^5.1.2",
     "shortid": "^2.2.16",
-    "util": "^0.12.4"
+    "url": "^0.11.4",
+    "util": "^0.12.4",
+    "validator": "^13.15.20",
+    "xss-clean": "^0.1.4"
   }
 }
