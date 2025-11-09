@@ -125,7 +125,7 @@ const Hero = () => {
       );
 
       if (
-        response.status === 200 &&
+        (response.status === 200 || response.status === 201) &&
         response.data?.status === true &&
         response.data?.data?.shortUrl
       ) {
