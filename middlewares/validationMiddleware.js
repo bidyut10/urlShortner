@@ -77,43 +77,34 @@ const validateUrlCode = (req, res, next) => {
 const sanitizeInputs = (req, res, next) => {
   // Sanitize body
   if (req.body) {
-    Object.keys(req.body).forEach((key) => {
+    for (const key in req.body) {
       if (typeof req.body[key] === "string") {
-        // Trim whitespace
-        req.body[key] = req.body[key].trim();
-
-        // Remove null bytes
-        req.body[key] = req.body[key].replace(/\0/g, "");
+        req.body[key] = req.body[key].trim().replace(/\0/g, "");
       }
-    });
+    }
   }
 
   // Sanitize params
   if (req.params) {
-    Object.keys(req.params).forEach((key) => {
+    for (const key in req.params) {
       if (typeof req.params[key] === "string") {
-        req.params[key] = req.params[key].trim();
-        req.params[key] = req.params[key].replace(/\0/g, "");
+        req.params[key] = req.params[key].trim().replace(/\0/g, "");
       }
-    });
+    }
   }
 
-  // Sanitize query - Create a new object instead of modifying directly
+  // ✅ Sanitize query parameters
   if (req.query && Object.keys(req.query).length > 0) {
-    const sanitizedQuery = {};
-    Object.keys(req.query).forEach((key) => {
+    for (const key in req.query) {
       if (typeof req.query[key] === "string") {
-        sanitizedQuery[key] = req.query[key].trim().replace(/\0/g, "");
-      } else {
-        sanitizedQuery[key] = req.query[key];
+        req.query[key] = req.query[key].trim().replace(/\0/g, "");
       }
-    });
-    // Replace the query object entirely
-    req.query = sanitizedQuery;
+    }
   }
 
   next();
 };
+
 
 // Check for suspicious patterns in requests
 const checkSuspiciousActivity = (req, res, next) => {
