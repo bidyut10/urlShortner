@@ -98,14 +98,18 @@ const sanitizeInputs = (req, res, next) => {
     });
   }
 
-  // Sanitize query
-  if (req.query) {
+  // Sanitize query - Create a new object instead of modifying directly
+  if (req.query && Object.keys(req.query).length > 0) {
+    const sanitizedQuery = {};
     Object.keys(req.query).forEach((key) => {
       if (typeof req.query[key] === "string") {
-        req.query[key] = req.query[key].trim();
-        req.query[key] = req.query[key].replace(/\0/g, "");
+        sanitizedQuery[key] = req.query[key].trim().replace(/\0/g, "");
+      } else {
+        sanitizedQuery[key] = req.query[key];
       }
     });
+    // Replace the query object entirely
+    req.query = sanitizedQuery;
   }
 
   next();
