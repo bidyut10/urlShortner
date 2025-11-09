@@ -6,7 +6,7 @@ import {
   Copy,
   SquareArrowOutUpRight,
   ChevronDown,
-  Loader2,
+  Loader,
 } from "lucide-react";
 
 const Hero = () => {
@@ -18,47 +18,22 @@ const Hero = () => {
   const [alertVisible, setAlertVisible] = useState({ message: "", type: "" });
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [lastProcessedUrl, setLastProcessedUrl] = useState("");
   const dropdownRef = useRef(null);
 
-  // Cache for API responses
+  // Cache for API responses stored in memory
   const cacheRef = useRef({});
 
-  // Load from sessionStorage on mount
+  // Hide short URL box when long URL changes from last processed URL
   useEffect(() => {
-    const savedLongUrl = sessionStorage.getItem("longUrl");
-    const savedShortUrl = sessionStorage.getItem("shortUrl");
-    const savedCache = sessionStorage.getItem("urlCache");
+    const normalizedLongUrl = longUrl.trim().toLowerCase();
+    const normalizedLastProcessed = lastProcessedUrl.toLowerCase();
 
-    if (savedLongUrl) setLongUrl(savedLongUrl);
-    if (savedShortUrl) {
-      setShortUrl(savedShortUrl);
-      setQrCode(savedShortUrl);
+    if (normalizedLongUrl !== normalizedLastProcessed) {
+      setShortUrl("");
+      setQrCode("");
     }
-    if (savedCache) {
-      try {
-        cacheRef.current = JSON.parse(savedCache);
-      } catch (e) {
-        console.error("Failed to parse cache:", e);
-      }
-    }
-  }, []);
-
-  // Save to sessionStorage whenever values change
-  useEffect(() => {
-    if (longUrl) {
-      sessionStorage.setItem("longUrl", longUrl);
-    } else {
-      sessionStorage.removeItem("longUrl");
-    }
-  }, [longUrl]);
-
-  useEffect(() => {
-    if (shortUrl) {
-      sessionStorage.setItem("shortUrl", shortUrl);
-    } else {
-      sessionStorage.removeItem("shortUrl");
-    }
-  }, [shortUrl]);
+  }, [longUrl, lastProcessedUrl]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -82,56 +57,25 @@ const Hero = () => {
     setTimeout(() => setAlertVisible({ message: "", type: "" }), 2000);
   };
 
-  // Sanitize and validate URL
+  // Sanitize and validate URL - simple check only
   const isValidUrl = (url) => {
-    try {
-      const trimmedUrl = url.trim();
+    const trimmedUrl = url.trim();
 
-      // Check for empty or only whitespace
-      if (!trimmedUrl) return false;
+    // Check for empty
+    if (!trimmedUrl) return false;
 
-      // Check for SQL injection patterns
-      const sqlPatterns =
-        /(\b(SELECT|INSERT|UPDATE|DELETE|DROP|CREATE|ALTER|EXEC|EXECUTE|SCRIPT|UNION)\b)/gi;
-      if (sqlPatterns.test(trimmedUrl)) return false;
+    // Very basic check - just ensure it has a domain structure
+    const hasValidChars = /^[a-zA-Z0-9:/?#\[\]@!$&'()*+,;=._~%-]+$/.test(
+      trimmedUrl
+    );
+    const hasDomain = /[a-zA-Z0-9-]+\.[a-zA-Z]{2,}/.test(trimmedUrl);
 
-      // Check for script injection
-      const scriptPatterns = /<script|javascript:|onerror=|onload=/gi;
-      if (scriptPatterns.test(trimmedUrl)) return false;
-
-      // Validate URL format
-      const urlPattern =
-        /^(https?:\/\/)?([\da-z\.-]+)\.([a-z\.]{2,6})([\/\w \.-]*)*\/?$/i;
-      if (!urlPattern.test(trimmedUrl)) return false;
-
-      // Try to create URL object for additional validation
-      let testUrl = trimmedUrl;
-      if (
-        !trimmedUrl.startsWith("http://") &&
-        !trimmedUrl.startsWith("https://")
-      ) {
-        testUrl = "https://" + trimmedUrl;
-      }
-
-      const urlObj = new URL(testUrl);
-
-      // Check for suspicious protocols
-      if (!["http:", "https:"].includes(urlObj.protocol)) return false;
-
-      return true;
-    } catch (error) {
-      return false;
-    }
+    return hasValidChars && hasDomain;
   };
 
-  // Sanitize URL
+  // Sanitize URL - minimal processing
   const sanitizeUrl = (url) => {
     let sanitized = url.trim();
-
-    // Remove any script tags or javascript
-    sanitized = sanitized.replace(/<script[^>]*>.*?<\/script>/gi, "");
-    sanitized = sanitized.replace(/javascript:/gi, "");
-    sanitized = sanitized.replace(/on\w+\s*=/gi, "");
 
     // Ensure protocol
     if (!sanitized.startsWith("http://") && !sanitized.startsWith("https://")) {
@@ -143,12 +87,13 @@ const Hero = () => {
 
   const handleGenerateShortUrl = async () => {
     try {
-      if (longUrl.length === 0) {
+      // Basic validation
+      if (!longUrl || longUrl.trim().length === 0) {
         showAlert("Please enter your URL.", "error");
         return;
       }
 
-      // Validate URL
+      // Validate URL format
       if (!isValidUrl(longUrl)) {
         showAlert("Please enter a valid URL.", "error");
         return;
@@ -156,11 +101,18 @@ const Hero = () => {
 
       const sanitizedUrl = sanitizeUrl(longUrl);
 
-      // Check cache first
+      // Check if this is the same URL we just processed
+      if (sanitizedUrl === lastProcessedUrl && shortUrl) {
+        showAlert("Link loaded from cache!", "success");
+        return;
+      }
+
+      // Check cache
       if (cacheRef.current[sanitizedUrl]) {
         setShortUrl(cacheRef.current[sanitizedUrl]);
         setQrCode(cacheRef.current[sanitizedUrl]);
-        showAlert("Link loaded successfully!", "success");
+        setLastProcessedUrl(sanitizedUrl);
+        showAlert("Link loaded from cache!", "success");
         return;
       }
 
@@ -170,11 +122,10 @@ const Hero = () => {
         `${import.meta.env.VITE_BACKEND_URL}/v1/shorten`,
         { longUrl: sanitizedUrl },
         {
-          timeout: 10000, // 10 second timeout
+          timeout: 10000,
           headers: {
             "Content-Type": "application/json",
           },
-          validateStatus: (status) => status < 500, // Resolve only if the status code is less than 500
         }
       );
 
@@ -183,15 +134,11 @@ const Hero = () => {
 
         // Update cache
         cacheRef.current[sanitizedUrl] = newShortUrl;
-        sessionStorage.setItem("urlCache", JSON.stringify(cacheRef.current));
 
         setShortUrl(newShortUrl);
         setQrCode(newShortUrl);
+        setLastProcessedUrl(sanitizedUrl);
         showAlert("URL shortened successfully.", "success");
-      } else if (response.status === 429) {
-        showAlert("Too many requests. Please try again later.", "error");
-      } else if (response.status === 400) {
-        showAlert("Invalid URL format.", "error");
       } else {
         showAlert("Failed to shorten URL. Please try again.", "error");
       }
@@ -201,13 +148,15 @@ const Hero = () => {
       if (error.code === "ECONNABORTED") {
         showAlert("Request timeout. Please try again.", "error");
       } else if (error.response) {
-        // Server responded with error
-        showAlert(
-          `Error: ${error.response.status}. Please try again.`,
-          "error"
-        );
+        const status = error.response.status;
+        if (status === 429) {
+          showAlert("Too many requests. Please try again later.", "error");
+        } else if (status === 400) {
+          showAlert("Invalid URL format.", "error");
+        } else {
+          showAlert("Failed to shorten URL. Please try again.", "error");
+        }
       } else if (error.request) {
-        // Request made but no response
         showAlert("Network error. Please check your connection.", "error");
       } else {
         showAlert("Failed to shorten URL. Please try again.", "error");
@@ -252,16 +201,15 @@ const Hero = () => {
 
   return (
     <div className="border-y border-neutral-100 w-full">
-      {/* Full-screen loader */}
       {isLoading && (
         <div className="fixed inset-0 bg-white bg-opacity-80 flex items-center justify-center z-50">
-          <Loader2 size={48} className="text-yellow-400 animate-spin" />
+          <Loader size={28} className="text-neutral-800 animate-spin" />
         </div>
       )}
 
       {alertVisible.message && (
         <div
-          className={`fixed top-6 right-6 ${
+          className={`fixed top-4 right-4 md:top-6 md:right-6 ${
             alertVisible.type === "success" ? "bg-green-500" : "bg-red-500"
           } text-white px-4 py-3 z-50`}
         >

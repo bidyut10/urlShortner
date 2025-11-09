@@ -18,7 +18,7 @@ const Home = () => {
       try {
         // Fire and forget - no await, runs completely in background
         axios
-          .get("https://cuturl-oi0x.onrender.com/health", {
+          .get(`${import.meta.env.VITE_BACKEND_URL}/v1/health`, {
             timeout: 30000, // 30 second timeout for cold start
             headers: {
               "Cache-Control": "no-cache",
@@ -29,6 +29,7 @@ const Home = () => {
             // The purpose is just to wake up the server
           });
       } catch (error) {
+        console.error("Error during server warmup:", error);
         // Silent catch - no error handling needed
       }
     };
@@ -40,7 +41,7 @@ const Home = () => {
     // This ensures server is definitely awake by the time they generate URL
     const retryTimeout = setTimeout(() => {
       axios
-        .get("https://cuturl-oi0x.onrender.com/health", {
+        .get(`${import.meta.env.VITE_BACKEND_URL}/v1/health`, {
           timeout: 10000,
         })
         .catch(() => {});
