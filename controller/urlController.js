@@ -1,165 +1,182 @@
 const urlModel = require("../model/urlModel");
+const { captureUserDetails } = require("../utils/meta-data");
+const { generateUniqueUrlCode } = require("../utils/url-id");
 const { validateUrl } = require("../utils/url-validator");
-const shortid = require("shortid");
 
-// ✅ Server health check
-const serverStatus = async (req, res) => {
-  try {
-    return res.status(200).json({
-      status: true,
-      message: "Server is running",
-      timestamp: new Date().toISOString(),
-    });
-  } catch (error) {
-    return res.status(500).json({
-      status: false,
-      message: "Health check failed",
-    });
-  }
-};
-
-// ✅ Create shortened URL
+// Create shortened URL API endpoint
 const createUrl = async (req, res) => {
   try {
-    const { longUrl, customAlias, expiresIn } = req.body;
+    // Input validation
+    const longUrl = req.body.longUrl;
 
-    // Validate URL using comprehensive validator
+    if (!longUrl) {
+      return res.status(400).json({
+        status: false,
+        message: "URL is required",
+        errors: ["longUrl field is missing or empty"],
+      });
+    }
+
+    // Comprehensive URL validation
     const validation = await validateUrl(longUrl);
+
     if (!validation.isValid) {
       return res.status(400).json({
         status: false,
-        message: "URL validation failed",
+        message: "Invalid URL",
         errors: validation.errors,
       });
     }
 
-    // Generate or use custom URL code
-    const urlCode = customAlias || shortid.generate();
+    // Check if URL already exists
+    const existingUrl = await urlModel.findOne({
+      longUrl: validation.sanitizedUrl,
+    });
 
-    // Check if custom alias already exists
-    if (customAlias) {
-      const existing = await urlModel.findOne({ urlCode: customAlias });
-      if (existing) {
-        return res.status(409).json({
-          status: false,
-          message: "Custom alias already in use",
-        });
-      }
+    if (existingUrl) {
+      return res.status(200).json({
+        status: true,
+        data: {
+          urlCode: existingUrl.urlCode,
+          longUrl: existingUrl.longUrl,
+          shortUrl: existingUrl.shortUrl,
+          createdAt: existingUrl.createdAt,
+        },
+        message: "URL already shortened",
+      });
     }
 
-    // Calculate expiration date
-    let expiresAt = null;
-    if (expiresIn) {
-      expiresAt = new Date();
-      expiresAt.setDate(expiresAt.getDate() + parseInt(expiresIn));
+    // Generate unique URL code
+    const urlCode = await generateUniqueUrlCode();
+
+    // Construct short URL
+    const baseUrl = process.env.VITE_BACKEND_URL?.replace(/\/$/, "");
+    if (!baseUrl) {
+      throw new Error("Backend URL not configured");
     }
 
-    // Build short URL
-    const baseUrl = process.env.VITE_BACKEND_URL || "http://localhost:3000";
     const shortUrl = `${baseUrl}/v1/${urlCode}`;
 
-    // Create URL document
-    const urlDoc = new urlModel({
+    // Capture user metadata
+    const userMetadata = captureUserDetails(req);
+
+    // Create new URL document
+    const newUrl = await urlModel.create({
       longUrl: validation.sanitizedUrl,
       shortUrl,
       urlCode,
-      expiresAt,
-      userMetadata: {
-        ip: req.headers["x-forwarded-for"] || req.connection.remoteAddress,
-        userAgent: req.headers["user-agent"],
-        referer: req.headers["referer"] || req.headers["referrer"],
-        timestamp: new Date(),
-      },
+      userMetadata,
+      clickCount: 0,
+      isActive: true,
     });
-
-    await urlDoc.save();
 
     return res.status(201).json({
       status: true,
-      message: "URL shortened successfully",
       data: {
-        longUrl: urlDoc.longUrl,
-        shortUrl: urlDoc.shortUrl,
-        urlCode: urlDoc.urlCode,
-        expiresAt: urlDoc.expiresAt,
-        createdAt: urlDoc.createdAt,
+        urlCode: newUrl.urlCode,
+        longUrl: newUrl.longUrl,
+        shortUrl: newUrl.shortUrl,
+        createdAt: newUrl.createdAt,
       },
+      message: "URL shortened successfully",
     });
   } catch (error) {
-    console.error("Error creating short URL:", error);
+    console.error("Create URL Error:", error);
+
+    if (error.name === "ValidationError") {
+      return res.status(400).json({
+        status: false,
+        message: "Validation failed",
+        errors: Object.values(error.errors).map((e) => e.message),
+      });
+    }
 
     if (error.code === 11000) {
       return res.status(409).json({
         status: false,
-        message: "URL code already exists",
+        message: "Duplicate URL code detected",
       });
     }
 
     return res.status(500).json({
       status: false,
-      message: "Failed to create short URL",
-      error: process.env.NODE_ENV === "development" ? error.message : undefined,
+      message: "Internal server error",
+      errorId: Date.now().toString(36),
     });
   }
 };
 
-// ✅ Redirect to original URL
+// Redirect to original URL API endpoint
 const getUrl = async (req, res) => {
   try {
-    const { urlCode } = req.params;
+    const urlCode = req.params.urlCode;
 
-    // Find active, non-expired URL
-    const urlDoc = await urlModel.findActiveUrl(urlCode);
-
-    if (!urlDoc) {
-      return res.status(404).json({
+    if (!urlCode || urlCode.length > 50) {
+      return res.status(400).json({
         status: false,
-        message: "Short URL not found or has expired",
+        message: "Invalid URL code",
       });
     }
 
-    // Track click asynchronously (don't block redirect)
-    setImmediate(() => {
-      urlDoc.trackClick({
-        timestamp: new Date(),
-        ip: req.headers["x-forwarded-for"] || req.connection.remoteAddress,
-        userAgent: req.headers["user-agent"],
-        referer: req.headers["referer"] || req.headers["referrer"],
-      }).catch(err => {
-        console.error("Failed to track click:", err);
-      });
+    // Find URL in database
+    const urlDocument = await urlModel.findOne({
+      urlCode,
+      isActive: true,
     });
 
-    // Check if analytics view is requested
-    const viewAnalytics = req.sanitizedQuery?.analytics === "true";
-
-    if (viewAnalytics) {
-      // Return analytics instead of redirecting
-      return res.status(200).json({
-        status: true,
-        message: "URL analytics",
-        data: {
-          longUrl: urlDoc.longUrl,
-          shortUrl: urlDoc.shortUrl,
-          urlCode: urlDoc.urlCode,
-          clickCount: urlDoc.clickCount,
-          createdAt: urlDoc.createdAt,
-          expiresAt: urlDoc.expiresAt,
-          isActive: urlDoc.isActive,
-          recentClicks: urlDoc.clicks.slice(-10), // Last 10 clicks
-        },
+    if (!urlDocument) {
+      return res.status(404).json({
+        status: false,
+        message: "Short URL not found or has been deactivated",
       });
     }
 
-    // Redirect to original URL
-    return res.redirect(302, urlDoc.longUrl);
-  } catch (error) {
-    console.error("Error retrieving URL:", error);
+    // Update click count asynchronously
+    urlModel
+      .findByIdAndUpdate(urlDocument._id, {
+        $inc: { clickCount: 1 },
+        $set: { lastAccessed: new Date() },
+      })
+      .catch((err) => console.error("Click count update failed:", err));
 
+    /**
+     * 🔁 Using 302 (Temporary Redirect)
+     * - Keeps tracking accurate (no browser caching like 301).
+     * - Lets me update target URLs anytime.
+     * - Prevents SEO and caching issues.
+     * - Standard choice for all major URL shorteners.
+     */
+
+    return res.redirect(302, urlDocument.longUrl);
+  } catch (error) {
+    console.error("Get URL Error:", error);
     return res.status(500).json({
       status: false,
-      message: "Failed to retrieve URL",
-      error: process.env.NODE_ENV === "development" ? error.message : undefined,
+      message: "Internal server error",
+    });
+  }
+};
+
+// Health Check API endpoint
+const serverStatus = async (req, res) => {
+  try {
+    // Check database connectivity
+    const dbStatus = await urlModel.db.db.admin().ping();
+
+    return res.status(200).json({
+      status: true,
+      message: "Server is running smoothly",
+      data: {
+        uptime: process.uptime(),
+        timestamp: new Date().toISOString(),
+        database: dbStatus.ok === 1 ? "connected" : "disconnected",
+      },
+    });
+  } catch (error) {
+    console.error("Health check error:", error);
+    return res.status(503).json({
+      status: false,
+      message: "Service unavailable",
     });
   }
 };
