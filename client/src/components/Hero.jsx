@@ -2,12 +2,7 @@ import { QRCodeCanvas } from "qrcode.react";
 import { saveAs } from "file-saver";
 import axios from "axios";
 import { useState, useEffect, useRef } from "react";
-import {
-  Copy,
-  SquareArrowOutUpRight,
-  ChevronDown,
-  Loader,
-} from "lucide-react";
+import { Copy, SquareArrowOutUpRight, ChevronDown, Loader } from "lucide-react";
 
 const Hero = () => {
   const [longUrl, setLongUrl] = useState("");
@@ -129,8 +124,12 @@ const Hero = () => {
         }
       );
 
-      if (response.status === 200 && response.data && response.data.data) {
-        const { shortUrl: newShortUrl } = response.data.data;
+      if (
+        response.status === 200 &&
+        response.data?.status === true &&
+        response.data?.data?.shortUrl
+      ) {
+        const newShortUrl = response.data.data.shortUrl;
 
         // Update cache
         cacheRef.current[sanitizedUrl] = newShortUrl;
