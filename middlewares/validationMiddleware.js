@@ -73,10 +73,9 @@ const validateUrlCode = (req, res, next) => {
   next();
 };
 
-// Sanitize request inputs
 const sanitizeInputs = (req, res, next) => {
   // Sanitize body
-  if (req.body) {
+  if (req.body && typeof req.body === "object") {
     for (const key in req.body) {
       if (typeof req.body[key] === "string") {
         req.body[key] = req.body[key].trim().replace(/\0/g, "");
@@ -85,7 +84,7 @@ const sanitizeInputs = (req, res, next) => {
   }
 
   // Sanitize params
-  if (req.params) {
+  if (req.params && typeof req.params === "object") {
     for (const key in req.params) {
       if (typeof req.params[key] === "string") {
         req.params[key] = req.params[key].trim().replace(/\0/g, "");
@@ -93,12 +92,15 @@ const sanitizeInputs = (req, res, next) => {
     }
   }
 
-  // ✅ Sanitize query parameters
-  if (req.query && Object.keys(req.query).length > 0) {
-    for (const key in req.query) {
-      if (typeof req.query[key] === "string") {
-        req.query[key] = req.query[key].trim().replace(/\0/g, "");
-      }
+  // ✅ Safe handling for Express 5 - never modify req.query
+  req.sanitizedQuery = {};
+  const rawQuery = req.query || {}; // prevent undefined access
+
+  for (const key in rawQuery) {
+    if (typeof rawQuery[key] === "string") {
+      req.sanitizedQuery[key] = rawQuery[key].trim().replace(/\0/g, "");
+    } else {
+      req.sanitizedQuery[key] = rawQuery[key];
     }
   }
 

@@ -29,6 +29,19 @@ const app = express();
 // Trust proxy for accurate IP addresses (if behind nginx/cloudflare)
 app.set("trust proxy", 1);
 
+// ✅ FIX FOR EXPRESS 5: Make req.query writable BEFORE any middleware that tries to modify it
+app.use((req, res, next) => {
+  // Make req.query writable for Express 5 compatibility
+  const originalQuery = req.query;
+  Object.defineProperty(req, 'query', {
+    ...Object.getOwnPropertyDescriptor(req, 'query'),
+    value: originalQuery,
+    writable: true,
+    configurable: true
+  });
+  next();
+});
+
 // Security Headers with Helmet
 app.use(helmet({
   contentSecurityPolicy: {
@@ -70,8 +83,8 @@ app.use(cors({
     "Content-Type",
     "Authorization",
     "X-Requested-With",
-    "Cache-Control",  
-    "Pragma"          
+    "Cache-Control",
+    "Pragma"
   ],
   exposedHeaders: ["Content-Length", "X-Request-ID"],
   maxAge: 600 // Cache preflight requests for 10 minutes
@@ -93,7 +106,7 @@ app.use(compression({
 app.use(bodyParser.json({ limit: "10kb" })); // Prevent large payload attacks
 app.use(bodyParser.urlencoded({ extended: true, limit: "10kb" }));
 
-// Data Sanitization against NoSQL Injection
+// Data Sanitization against NoSQL Injection - NOW WORKS WITH EXPRESS 5
 app.use(mongoSanitize({
   replaceWith: "_",
   onSanitize: ({ req, key }) => {

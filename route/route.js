@@ -1,10 +1,7 @@
+// ✅ route/route.js
+
 const express = require("express");
 const router = express.Router();
-const {
-  createUrl,
-  getUrl,
-  serverStatus,
-} = require("../controller/urlController");
 
 const {
   validateShortenRequest,
@@ -13,17 +10,28 @@ const {
   checkSuspiciousActivity,
 } = require("../middlewares/validationMiddleware");
 
-// Apply sanitization and suspicious activity check to all routes
+const {
+  createUrl,
+  getUrl,
+  serverStatus,
+} = require("../controller/urlController");
+
+// ✅ Verify all middlewares are actually defined
+if (
+  typeof sanitizeInputs !== "function" ||
+  typeof checkSuspiciousActivity !== "function"
+) {
+  console.error("❌ Middleware import error: sanitizeInputs or checkSuspiciousActivity not found");
+  process.exit(1);
+}
+
+// ✅ Apply middlewares safely
 router.use(sanitizeInputs);
 router.use(checkSuspiciousActivity);
 
-// Health check endpoint (no restrictions)
+// ✅ Define routes
 router.get("/v1/health", serverStatus);
-
-// Create shortened URL
 router.post("/v1/shorten", validateShortenRequest, createUrl);
-
-// Redirect to original URL
 router.get("/v1/:urlCode", validateUrlCode, getUrl);
 
 module.exports = router;
