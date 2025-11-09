@@ -26,14 +26,4 @@ router.post("/v1/shorten", validateShortenRequest, createUrl);
 // Redirect to original URL
 router.get("/v1/:urlCode", validateUrlCode, getUrl);
 
-// Catch-all for undefined routes
-router.all("*", (req, res) => {
-  res.status(404).json({
-    status: false,
-    message: "Route not found",
-    path: req.originalUrl,
-    method: req.method,
-  });
-});
-
 module.exports = router;
