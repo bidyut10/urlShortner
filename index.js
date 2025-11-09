@@ -65,8 +65,14 @@ app.use(cors({
   },
   credentials: true,
   optionsSuccessStatus: 200,
-  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
+  methods: ["GET", "POST", "OPTIONS"],
+  allowedHeaders: [
+    "Content-Type",
+    "Authorization",
+    "X-Requested-With",
+    "Cache-Control",  
+    "Pragma"          
+  ],
   exposedHeaders: ["Content-Length", "X-Request-ID"],
   maxAge: 600 // Cache preflight requests for 10 minutes
 }));
