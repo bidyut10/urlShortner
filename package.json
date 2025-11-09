@@ -31,6 +31,7 @@
     "mongoose": "^6.4.4",
     "morgan": "^1.10.0",
     "node-cache": "^5.1.2",
+    "node-fetch": "^3.3.2",
     "shortid": "^2.2.16",
     "url": "^0.11.4",
     "util": "^0.12.4",

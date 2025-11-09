@@ -2,7 +2,12 @@ import { QRCodeCanvas } from "qrcode.react";
 import { saveAs } from "file-saver";
 import axios from "axios";
 import { useState, useEffect, useRef } from "react";
-import { Copy, SquareArrowOutUpRight, ChevronDown } from "lucide-react";
+import {
+  Copy,
+  SquareArrowOutUpRight,
+  ChevronDown,
+  Loader2,
+} from "lucide-react";
 
 const Hero = () => {
   const [longUrl, setLongUrl] = useState("");
@@ -162,7 +167,7 @@ const Hero = () => {
       setIsLoading(true);
 
       const response = await axios.post(
-        `${import.meta.env.VITE_BACKEND_URL}/api/shorten`,
+        `${import.meta.env.VITE_BACKEND_URL}/v1/shorten`,
         { longUrl: sanitizedUrl },
         {
           timeout: 10000, // 10 second timeout
@@ -247,6 +252,13 @@ const Hero = () => {
 
   return (
     <div className="border-y border-neutral-100 w-full">
+      {/* Full-screen loader */}
+      {isLoading && (
+        <div className="fixed inset-0 bg-white bg-opacity-80 flex items-center justify-center z-50">
+          <Loader2 size={48} className="text-yellow-400 animate-spin" />
+        </div>
+      )}
+
       {alertVisible.message && (
         <div
           className={`fixed top-6 right-6 ${

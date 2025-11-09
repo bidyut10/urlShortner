@@ -110,7 +110,7 @@ const createRateLimiter = rateLimit({
   legacyHeaders: false,
   skip: (req) => {
     // Skip rate limiting for health check
-    return req.path === "/health" || req.path === "/";
+    return req.path === "/v1/health";
   },
   handler: (req, res) => {
     res.status(429).json({
@@ -274,10 +274,10 @@ const startServer = async () => {
     const server = app.listen(PORT, () => {
       console.log(`
 ╔════════════════════════════════════════╗
-║   🚀 Server Running Successfully      ║
-║   Port: ${PORT.toString().padEnd(29)}║
-║   Environment: ${(process.env.NODE_ENV || "development").padEnd(22)}║
-║   Time: ${new Date().toLocaleString().padEnd(28)}║
+║   🚀 Server Running Successfully      
+║   Port: ${PORT.toString().padEnd(29)}
+║   Environment: ${(process.env.NODE_ENV || "development").padEnd(22)}
+║   Time: ${new Date().toLocaleString().padEnd(28)}
 ╚════════════════════════════════════════╝
       `);
     });
@@ -301,7 +301,6 @@ const startServer = async () => {
 
     process.on("SIGTERM", shutdown);
     process.on("SIGINT", shutdown);
-
   } catch (error) {
     console.error("Failed to start server:", error);
     process.exit(1);
@@ -310,14 +309,14 @@ const startServer = async () => {
 
 // Handle uncaught exceptions
 process.on("uncaughtException", (err) => {
-  console.error("UNCAUGHT EXCEPTION! 💥 Shutting down...");
+  console.error("UNCAUGHT EXCEPTION! Shutting down...");
   console.error(err.name, err.message);
   process.exit(1);
 });
 
 // Handle unhandled rejections
 process.on("unhandledRejection", (err) => {
-  console.error("UNHANDLED REJECTION! 💥 Shutting down...");
+  console.error("UNHANDLED REJECTION! Shutting down...");
   console.error(err);
   process.exit(1);
 });

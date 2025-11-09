@@ -1,177 +1,13 @@
 const urlModel = require("../model/urlModel");
-const shortid = require("shortid");
-const validator = require("validator");
-const dns = require("dns").promises;
-const { URL } = require("url");
+const { captureUserDetails } = require("../utils/meta-data");
+const { generateUniqueUrlCode } = require("../utils/url-id");
+const { validateUrl } = require("../utils/url-validator");
 
-// Comprehensive URL validation with security checks
-const validateUrl = async (urlString) => {
-  const errors = [];
-
-  // Basic validation
-  if (!urlString || typeof urlString !== "string") {
-    errors.push("URL must be a non-empty string");
-    return { isValid: false, errors };
-  }
-
-  const trimmedUrl = urlString.trim();
-
-  // Length validation
-  if (trimmedUrl.length > 2048) {
-    errors.push("URL exceeds maximum length of 2048 characters");
-  }
-
-  if (trimmedUrl.length < 10) {
-    errors.push("URL is too short to be valid");
-  }
-
-  // Protocol validation - must use http or https
-  if (!validator.isURL(trimmedUrl, {
-    protocols: ["http", "https"],
-    require_protocol: true,
-    require_valid_protocol: true,
-    allow_underscores: false,
-    allow_trailing_dot: false,
-    allow_protocol_relative_urls: false,
-  })) {
-    errors.push("Invalid URL format. Must use http:// or https://");
-    return { isValid: false, errors };
-  }
-
-  try {
-    const parsedUrl = new URL(trimmedUrl);
-
-    // Block localhost and private IP ranges
-    const blockedHosts = [
-      "localhost",
-      "127.0.0.1",
-      "0.0.0.0",
-      "[::1]",
-      "[::]",
-    ];
-
-    const hostname = parsedUrl.hostname.toLowerCase();
-
-    if (blockedHosts.includes(hostname)) {
-      errors.push("Cannot shorten localhost or loopback addresses");
-    }
-
-    // Block private IP ranges
-    const privateIpPatterns = [
-      /^10\./,
-      /^172\.(1[6-9]|2[0-9]|3[0-1])\./,
-      /^192\.168\./,
-      /^169\.254\./,
-      /^fc00:/i,
-      /^fd00:/i,
-    ];
-
-    if (privateIpPatterns.some((pattern) => pattern.test(hostname))) {
-      errors.push("Cannot shorten private IP addresses");
-    }
-
-    // SQL Injection pattern detection
-    const sqlPatterns = [
-      /(\s*(union|select|insert|update|delete|drop|create|alter|exec|execute|script|javascript|eval|expression)\s*)/i,
-      /(;|\-\-|\/\*|\*\/|xp_|sp_)/i,
-      /('|"|`|;|--|\||&|\$|<|>|\{|\}|\[|\]|\(|\))/,
-    ];
-
-    const fullUrl = trimmedUrl.toLowerCase();
-    if (sqlPatterns.some((pattern) => pattern.test(fullUrl))) {
-      errors.push("URL contains potentially malicious patterns");
-    }
-
-    // Block dangerous file extensions
-    const dangerousExtensions = [
-      ".exe", ".bat", ".cmd", ".com", ".pif", ".scr",
-      ".vbs", ".js", ".jar", ".msi", ".dll", ".sh",
-    ];
-
-    const pathname = parsedUrl.pathname.toLowerCase();
-    if (dangerousExtensions.some((ext) => pathname.endsWith(ext))) {
-      errors.push("URL points to potentially dangerous file type");
-    }
-
-    // Block adult content domains (basic list)
-    const blockedKeywords = [
-      "porn", "xxx", "sex", "adult", "nsfw", "nude",
-      "casino", "gambling", "pharma", "viagra",
-    ];
-
-    if (blockedKeywords.some((keyword) =>
-      hostname.includes(keyword) || pathname.includes(keyword)
-    )) {
-      errors.push("URL contains blocked content");
-    }
-
-    // DNS validation (optional but recommended)
-    try {
-      await dns.lookup(hostname);
-    } catch (dnsError) {
-      errors.push("Domain does not resolve to a valid IP address");
-    }
-
-    // Check for suspicious patterns
-    if (hostname.split(".").length > 5) {
-      errors.push("URL has suspicious subdomain structure");
-    }
-
-    // Block data URIs and javascript protocols
-    if (parsedUrl.protocol === "data:" || parsedUrl.protocol === "javascript:") {
-      errors.push("Dangerous protocol detected");
-    }
-
-  } catch (parseError) {
-    errors.push("Failed to parse URL structure");
-  }
-
-  return {
-    isValid: errors.length === 0,
-    errors,
-    sanitizedUrl: trimmedUrl,
-  };
-};
-
-// Sanitize input to prevent XSS
-const sanitizeInput = (input) => {
-  if (typeof input !== "string") return "";
-  return input
-    .trim()
-    .replace(/[<>\"']/g, "")
-    .substring(0, 2048);
-};
-
-// Capture user metadata with privacy considerations
-const captureUserDetails = (req) => {
-  const forwardedFor = req.headers["x-forwarded-for"];
-  const ip = forwardedFor
-    ? forwardedFor.split(",")[0].trim()
-    : req.socket.remoteAddress;
-
-  return {
-    ip: ip || "unknown",
-    userAgent: req.headers["user-agent"]?.substring(0, 500) || "unknown",
-    timestamp: new Date().toISOString(),
-    referer: req.headers["referer"]?.substring(0, 500) || null,
-  };
-};
-
-// Generate unique URL code with collision prevention
-const generateUniqueUrlCode = async (maxAttempts = 5) => {
-  for (let i = 0; i < maxAttempts; i++) {
-    const urlCode = shortid.generate();
-    const existing = await urlModel.findOne({ urlCode });
-    if (!existing) return urlCode;
-  }
-  throw new Error("Failed to generate unique URL code");
-};
-
-// Create shortened URL
+// Create shortened URL API endpoint
 const createUrl = async (req, res) => {
   try {
     // Input validation
-    const longUrl = sanitizeInput(req.body.longUrl);
+    const longUrl = req.body.longUrl;
 
     if (!longUrl) {
       return res.status(400).json({
@@ -187,14 +23,14 @@ const createUrl = async (req, res) => {
     if (!validation.isValid) {
       return res.status(400).json({
         status: false,
-        message: "Invalid URL provided",
+        message: "Invalid URL",
         errors: validation.errors,
       });
     }
 
     // Check if URL already exists
     const existingUrl = await urlModel.findOne({
-      longUrl: validation.sanitizedUrl
+      longUrl: validation.sanitizedUrl,
     });
 
     if (existingUrl) {
@@ -244,7 +80,6 @@ const createUrl = async (req, res) => {
       },
       message: "URL shortened successfully",
     });
-
   } catch (error) {
     console.error("Create URL Error:", error);
 
@@ -271,10 +106,10 @@ const createUrl = async (req, res) => {
   }
 };
 
-// Redirect to original URL
+// Redirect to original URL API endpoint
 const getUrl = async (req, res) => {
   try {
-    const urlCode = sanitizeInput(req.params.urlCode);
+    const urlCode = req.params.urlCode;
 
     if (!urlCode || urlCode.length > 50) {
       return res.status(400).json({
@@ -286,7 +121,7 @@ const getUrl = async (req, res) => {
     // Find URL in database
     const urlDocument = await urlModel.findOne({
       urlCode,
-      isActive: true
+      isActive: true,
     });
 
     if (!urlDocument) {
@@ -296,18 +131,23 @@ const getUrl = async (req, res) => {
       });
     }
 
-    // Update click count (fire-and-forget to avoid latency)
-    urlModel.findByIdAndUpdate(
-      urlDocument._id,
-      {
+    // Update click count asynchronously
+    urlModel
+      .findByIdAndUpdate(urlDocument._id, {
         $inc: { clickCount: 1 },
-        $set: { lastAccessed: new Date() }
-      }
-    ).catch((err) => console.error("Click count update failed:", err));
+        $set: { lastAccessed: new Date() },
+      })
+      .catch((err) => console.error("Click count update failed:", err));
 
-    // Redirect to original URL
-    return res.redirect(301, urlDocument.longUrl);
+    /**
+     * 🔁 Using 302 (Temporary Redirect)
+     * - Keeps tracking accurate (no browser caching like 301).
+     * - Lets me update target URLs anytime.
+     * - Prevents SEO and caching issues.
+     * - Standard choice for all major URL shorteners.
+     */
 
+    return res.redirect(302, urlDocument.longUrl);
   } catch (error) {
     console.error("Get URL Error:", error);
     return res.status(500).json({
@@ -317,7 +157,7 @@ const getUrl = async (req, res) => {
   }
 };
 
-// Health check endpoint
+// Health Check API endpoint
 const serverStatus = async (req, res) => {
   try {
     // Check database connectivity
